@@ -2,7 +2,6 @@
 
 **Adaptive Bidirectional Alignment (ABA)**  
 *A space-aware and status-aware framework for rebalanced multimodal learning*
-[![Task](https://img.shields.io/badge/Task-Multimodal%20Learning-orange)]()
 
 ---
 
