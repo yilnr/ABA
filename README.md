@@ -2,8 +2,7 @@
 
 Official PyTorch implementation of **Adaptive Bidirectional Alignment (ABA)**, accepted by the **35th ACM International Conference on Information and Knowledge Management (CIKM 2026)**.
 
-**Yuhan Zheng** and **Yang Yang**
-Nanjing University of Science and Technology
+For questions, please contact [zhengyuhan@njust.edu.cn](mailto:zhengyuhan@njust.edu.cn).
 
 [[Paper](https://doi.org/10.1145/3799682.3840700)] [[Code](https://github.com/yilnr/ABA)]
 
