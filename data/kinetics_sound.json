@@ -1,41 +1,109 @@
 {
-  "dataset": {
-    "dataset_name": "kinetics_sound",
-    "data_root": "/path/to/kinetics_sound"
-  },
-  "visual": {
-    "name": "resnet18"
-  },
-  "text": {
-    "name": "resnet18"
-  },
-  "loss": {
-    "type": "CrossEntropy"
-  },
-  "train": {
-    "epoch_dict": 100,
-    "batch_size": 256,
-    "num_workers": 8,
-    "optimizer": {
-      "type": "SGD",
-      "momentum": 0.9,
-      "lr": 0.01,
-      "wc": 0.1
+    "dataset": {
+        "dataset_name": "kinetics_sound",
+        "data_root":"/data/hlf/dataset/kinetics_sound"
     },
-    "lr_scheduler": {
-      "patience": 70
-    }
-  },
-  "test": {
-    "batch_size": 64,
-    "num_workers": 8
-  },
-  "setting": {
-    "type": "KS Classification",
-    "num_class": 31
-  },
-  "seed": 0,
-  "gpu_id": "0",
-  "debug": false,
-  "fps": 3
+
+    "db_file_paths":[
+        "/data/zyh/NeurIPS24-LFM/_db_file/embeddings_logits_ks/embeddings_raw_train_audio_logits.npy",
+        "/data/zyh/NeurIPS24-LFM/_db_file/embeddings_logits_ks/embeddings_raw_train_audio_video_e_logits.npy",
+        "/data/zyh/NeurIPS24-LFM/_db_file/embeddings_logits_ks/embeddings_raw_train_video_logits.npy",
+
+        "/data/zyh/NeurIPS24-LFM/_db_file/embeddings_logits_ks/logits_raw_train_audio_logits.npy",
+        "/data/zyh/NeurIPS24-LFM/_db_file/embeddings_logits_ks/logits_raw_train_video_logits.npy",
+        "/data/zyh/NeurIPS24-LFM/_db_file/embeddings_logits_ks/logits_raw_train_audio_video_e_logits.npy",
+
+        "/data/zyh/NeurIPS24-LFM/_db_file/embeddings_logits_ks/labels_train_audio_logits.npy",
+        "/data/zyh/NeurIPS24-LFM/_db_file/embeddings_logits_ks/labels_train_audio_video_e_logits.npy",
+        "/data/zyh/NeurIPS24-LFM/_db_file/embeddings_logits_ks/labels_train_video_logits.npy"
+    ],
+
+    "visual": {
+        "name": "resnet18"
+    },
+    "text": {
+        "name": "resnet18"
+    },
+    "loss": {
+        "type": "CrossEntropy"
+    },
+   "train": {
+        "epoch_dict" : 100,
+        "batch_size":16,
+        "batch_size_ORI":64,
+
+        "mixup_alpha": 1.0,
+        "num_workers":8,
+        "flat_ratio": 0.3,
+        "noise_ratio": 1.0e-10,
+        "noise_ratio_cls":1.0e-10,
+        "temperature1": 0.9,
+
+        "logits_ratio" : 1.0, 
+        
+        "merge_alpha_new_v": 1.0,
+        "merge_alpha_new_a": 1.0,
+        "min_alpha": 1.0,
+        "all_updata_epoch": 10,
+
+        "lower_a" : 0.3,
+        "upper_a" : 0.7,
+        
+        "lower_v" : 0.3,
+        "upper_v" : 0.7,
+        "new_encoder": 10,    
+
+        "dynamic_epoch": 60,    
+        "dynamic_epoch_tmp": 20,    
+        "decay": 0.99,    
+        
+        "random_pick_a" : true,
+        "top_a" : false,
+        "down_a" : false,
+        
+        "random_pick_v" : true,
+        "top_v" : false,
+        "down_v" : false,
+        
+        
+        "merge_alpha" : 0.5,
+        "epoch_thre" : -1,
+        "thre_sample" : 64,
+        "thre_sample_min" : 2,
+        "warmup_epochs" : 20,
+        
+        "optimizer": {
+            "type": "SGD", 
+            "momentum": 0.9,
+
+            "lr":1e-2,
+            "lr_try1_7337":1.5e-2,
+            "lr_ori":1e-2,
+            "wc" : 1.0e-4
+        },
+        "lr_scheduler":{
+            "type": "warmup",
+            "lr_step": [160, 180],
+            "lr_factor": 0.1,
+            "warmup_epoch": 2,
+            "patience":70
+        }
+    },
+    
+    "test": {
+        "batch_size":64,
+        "num_workers":8,
+        "lamda": 100
+    },
+    "setting": {
+        "type": "KS Classification", 
+        "num_class": 31,
+        "num_layers": 10
+    },
+    "seed": 0,
+    "gpu_id": "5",
+    "image_res": 224,
+    "debug": false,
+    "fps":3
 }
+
