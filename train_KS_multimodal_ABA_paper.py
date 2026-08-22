@@ -1,26 +1,21 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from collections import defaultdict
 import torch
-torch.autograd.set_detect_anomaly(True)
 import torch.nn as nn
 from torch.utils.data import DataLoader
 import torch.optim as optim
 from torch.nn import functional as F
 import os
 import warnings
-from utils.min_norm_solvers import MinNormSolver
 from tqdm import tqdm
 warnings.filterwarnings("ignore")
 import json
 import numpy as np
 import argparse
 from datetime import datetime
+from pathlib import Path
 from torch.utils.tensorboard import SummaryWriter
-# from dataset.VGGSoundDataset import VGGSound,SemiVGGSound
 import random
-import re
-from collections import defaultdict
 from sklearn.metrics import f1_score, average_precision_score
 from data.template import config
 from dataset.KS import VADataset
@@ -31,7 +26,9 @@ from utils.utils import (
     deep_update_dict,
 )
 
-from utils.tools import GSPlugin, weight_init
+from utils.tools import weight_init
+
+PROJECT_ROOT = Path(__file__).resolve().parent
 
 def compute_mAP(outputs, labels):
     y_true = labels.cpu().detach().numpy()
@@ -71,8 +68,6 @@ def init_epoch_info_file(info_dir, run_name, args, cfg):
 
 
 def append_epoch_info(info_path, row):
-    
-    file_exists = os.path.exists(info_path)
     with open(info_path, 'r', encoding='utf-8') as f:
         content = f.read()
     has_header = 'epoch,' in content
@@ -392,7 +387,7 @@ class AdaptiveBidirectionalAligner(nn.Module):
         return align_loss, stats
 
 
-def train_audio_video(epoch, train_loader, model, aligner, optimizer, logger, cls_k, logits_ratio, aba_beta=0.1, aba_warmup=0):
+def train_audio_video(epoch, train_loader, model, aligner, optimizer, logger, aba_beta=0.1, aba_warmup=0):
     model.train()
     aligner.train()
     tl = Averager()
@@ -416,7 +411,7 @@ def train_audio_video(epoch, train_loader, model, aligner, optimizer, logger, cl
     stat_compat_v2a = Averager()
     stat_valid_cls = Averager()
 
-    for step, (spectrogram, image, y) in enumerate(tqdm(train_loader)):
+    for spectrogram, image, y in tqdm(train_loader):
         image = image.float().cuda()
         y = y.cuda()
         spectrogram = spectrogram.unsqueeze(1).float().cuda()
@@ -516,10 +511,8 @@ def val(epoch, val_loader, model, logger):
     soft_pred_a = []
     soft_pred_v = []
     one_hot_label = []
-    score_a = 0.0
-    score_v = 0.0
     with torch.no_grad():
-        for step, (spectrogram, image, y) in enumerate(tqdm(val_loader)):
+        for spectrogram, image, y in tqdm(val_loader):
             label_list = label_list + torch.argmax(y, dim=1).tolist()
             one_hot_label = one_hot_label + y.tolist()
             image = image.cuda()
@@ -573,7 +566,7 @@ def val(epoch, val_loader, model, logger):
 if __name__ == '__main__':
     # ----- LOAD PARAM -----
     parser = argparse.ArgumentParser()
-    parser.add_argument('--config',type=str, default='/data/zyh/NeurIPS24-LFM/data/kinetics_sound.json')
+    parser.add_argument('--config', type=str, default=str(PROJECT_ROOT / 'data' / 'kinetics_sound.json'))
     parser.add_argument('--aba_beta', type=float, default=0.1, help='Weight beta for adaptive bidirectional alignment loss.')
     parser.add_argument('--aba_warmup', type=int, default=0, help='Warmup epochs for gradually enabling ABA loss. 0 means no warmup.')
     parser.add_argument('--aba_rho', type=float, default=0.75, help='Maximum transport budget rho in Eq. (23).')
@@ -586,8 +579,8 @@ if __name__ == '__main__':
     parser.add_argument('--aba_ot_eta', type=float, default=0.07, help='Entropy regularization coefficient eta for partial OT.')
     parser.add_argument('--aba_ot_iters', type=int, default=50, help='Number of Sinkhorn iterations for entropic partial OT.')
     parser.add_argument('--aba_min_samples_per_class', type=int, default=2, help='Minimum samples per class in a batch to compute feature-level OT.')
-    parser.add_argument('--tensorboard_root', type=str, default='/data/zyh/NeurIPS24-LFM/_tensorboard_runs', help='Root directory for TensorBoard runs.')
-    parser.add_argument('--epoch_info_dir', type=str, default='/data/zyh/NeurIPS24-LFM/_logs/ks_information', help='Directory for per-epoch text logs.')
+    parser.add_argument('--tensorboard_root', type=str, default=str(PROJECT_ROOT / '_tensorboard_runs'), help='Root directory for TensorBoard runs.')
+    parser.add_argument('--epoch_info_dir', type=str, default=str(PROJECT_ROOT / '_logs' / 'ks_information'), help='Directory for per-epoch text logs.')
 
     args = parser.parse_args()
     cfg = config
@@ -607,9 +600,7 @@ if __name__ == '__main__':
     os.environ["CUDA_VISIBLE_DEVICES"] = cfg['gpu_id']
     # ----- SET LOGGER -----
     local_rank = cfg['train']['local_rank']
-    logits_ratio = cfg['train']['logits_ratio']
-
-    logger, log_file, exp_id = create_logger(cfg, local_rank)
+    logger, _, _ = create_logger(cfg, local_rank)
 
     run_name = f"ks_ABA_{datetime.now().strftime('%Y%m%d_%H%M%S')}_seed{cfg['seed']}"
     tensorboard_dir = os.path.join(args.tensorboard_root, run_name)
@@ -629,9 +620,6 @@ if __name__ == '__main__':
 
     test_loader = DataLoader(dataset=test_dataset, batch_size=cfg['test']['batch_size'], shuffle=False,
                              num_workers=cfg['test']['num_workers'], pin_memory=True)
-    val_batch = next(iter(train_loader))
-
-
     # ----- MODEL -----
     model = AVClassifier(config=cfg)
     model = model.cuda()
@@ -666,9 +654,7 @@ if __name__ == '__main__':
                           weight_decay=cfg['train']['optimizer']['wc'])
 
     scheduler = optim.lr_scheduler.StepLR(optimizer, cfg['train']['lr_scheduler']['patience'], 0.1)
-    best_acc = 0
-    cls_k = []
-    
+
     for epoch in range(cfg['train']['epoch_dict']):
         logger.info(('Epoch {epoch:d} is pending...').format(epoch=epoch))
 
@@ -680,38 +666,15 @@ if __name__ == '__main__':
             aligner,
             optimizer,
             logger,
-            cls_k,
-            logits_ratio,
             aba_beta=args.aba_beta,
             aba_warmup=args.aba_warmup,
         )
 
         val_metrics = val(epoch, test_loader, model, logger)
-        acc = val_metrics['acc_multi']
-        acc_a = val_metrics['acc_audio']
-        acc_v = val_metrics['acc_video']
-
         write_tensorboard_scalars(writer, epoch, train_metrics, val_metrics)
         epoch_row = flatten_epoch_metrics(epoch, train_metrics, val_metrics)
         append_epoch_info(info_path, epoch_row)
         writer.flush()
         logger.info(f'Epoch {epoch:d} information appended to: {info_path}')
-        # if acc > best_acc:
-            # best_acc = acc
-            # print('Find a better model and save it!')
-            # logger.info('Find a better model and save it!')
-        m_name = cfg['visual']['name'] + '_' + cfg['text']['name']
-        
-        # if epoch % 10 == 0:
-        #     torch.save(model.state_dict(), f'/data/zyh/NeurIPS24-LFM/_bestmodel_all_dataset/ks/multi_KS_best_model_{epoch}_{acc}_{acc_a}_{acc_v}.pth')
-        
-
-        ### TODO:before
-        # if acc > best_acc:
-        #     best_acc = acc
-        #     print('Find a better model and save it!')
-        #     logger.info('Find a better model and save it!')
-        #     m_name = cfg['visual']['name'] + '_' + cfg['text']['name']
-        #     torch.save(model.state_dict(), '/data/lxe/multimodel/NeurIPS24-LFM-main/KS_model/multi_KS_best_model.pth')
     writer.close()
     logger.info('TensorBoard writer closed.')

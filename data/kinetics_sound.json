@@ -1,0 +1,41 @@
+{
+  "dataset": {
+    "dataset_name": "kinetics_sound",
+    "data_root": "/path/to/kinetics_sound"
+  },
+  "visual": {
+    "name": "resnet18"
+  },
+  "text": {
+    "name": "resnet18"
+  },
+  "loss": {
+    "type": "CrossEntropy"
+  },
+  "train": {
+    "epoch_dict": 100,
+    "batch_size": 256,
+    "num_workers": 8,
+    "optimizer": {
+      "type": "SGD",
+      "momentum": 0.9,
+      "lr": 0.01,
+      "wc": 0.1
+    },
+    "lr_scheduler": {
+      "patience": 70
+    }
+  },
+  "test": {
+    "batch_size": 64,
+    "num_workers": 8
+  },
+  "setting": {
+    "type": "KS Classification",
+    "num_class": 31
+  },
+  "seed": 0,
+  "gpu_id": "0",
+  "debug": false,
+  "fps": 3
+}
